@@ -5,6 +5,7 @@
 #include <cctype>
 #include<QTimer>
 #include"global.h"
+#include <QUdpSocket>
 
 #define MAPPING_FILE_NAME SCS_PLUGIN_MMF_NAME
 #define SHARED_MEMORY_SIZE (3 * 1024)
@@ -164,29 +165,57 @@ void AssistFuncWorker::doWork(){
 
     bool handbrakeResult = false; // 手刹值(0-1)
     float acceleratorResult;      // 油门值(0-1)
+    QUdpSocket *udpSocket = new QUdpSocket(this);
+    // QHostAddress targetAddress("192.168.31.250"); // 替换为目标设备的实际IP地址
+    QHostAddress targetAddress("192.168.31.215"); // 替换为目标设备的实际IP地址
+    quint16 targetPort = 12345;                  // 替换为目标设备上应用程序监听的实际端口号
+    QByteArray datagram = "Hello from Qt!";    // 要发送的数据
+    
+    // 发送数据报到目标地址和端口
+    udpSocket->writeDatagram(datagram, targetAddress, targetPort);
 
     while(isWorkerRunning){
 
-        handbrakeResult = bytes->truck_b.parkBrake; // 手刹值(0-1)
-        acceleratorResult = bytes->truck_f.gameThrottle; // 油门值(0-1)
+        // handbrakeResult = bytes->truck_b.parkBrake; // 手刹值(0-1)
+        // acceleratorResult = bytes->truck_f.gameThrottle; // 油门值(0-1)
         // 手刹为启用状态, 并且油门踩下大于50%, 模拟键盘的空格键解除手刹
         // qDebug("手刹:%d, 油门:%.4f", handbrakeResult, acceleratorResult);
         // qDebug("lightsParking:%d, lightsBeamLow:%d, lightsBeamHigh:%d, lightsBeacon:%d, lightsBrake:%d, lightsReverse:%d, lightsHazard:%d", bytes->truck_b.lightsParking, bytes->truck_b.lightsBeamLow, bytes->truck_b.lightsBeamHigh, bytes->truck_b.lightsBeacon, bytes->truck_b.lightsBrake, bytes->truck_b.lightsReverse, bytes->truck_b.lightsHazard);
-        if(handbrakeResult == 1 && acceleratorResult > 0.5f){
-            pushToQueue("当前手刹为启用状态, 且油门大于50%, 正在模拟空格键解除手刹...");
+        // if(handbrakeResult == 1 && acceleratorResult > 0.5f){
+        //     pushToQueue("当前手刹为启用状态, 且油门大于50%, 正在模拟空格键解除手刹...");
 
-            // 模拟空格键按下
-            simulateKeyPress(0x39, false);
-            QMetaObject::invokeMethod(QCoreApplication::instance(), [=](){
-                //释放按键
-                QTimer::singleShot(100, [=](){
-                    simulateKeyPress(0x39, true);
-                });
-            }, Qt::QueuedConnection);
+        //     // 模拟空格键按下
+        //     simulateKeyPress(0x39, false);
+        //     QMetaObject::invokeMethod(QCoreApplication::instance(), [=](){
+        //         //释放按键
+        //         QTimer::singleShot(100, [=](){
+        //             simulateKeyPress(0x39, true);
+        //         });
+        //     }, Qt::QueuedConnection);
+        // }
+
+        float speed = bytes->truck_f.speed; // 速度 m/s
+        bool isForward = true; // 是否前进, 默认前进
+        // qDebug() << "Speed: " << speed << "m/s" << speed * 3.6f << "km/h" << speed * 2.23693629f << "mph";
+        // 将 speed 0-28 m/s 归一化 到 uint16_t 0-1000 范围
+        if (speed < 0) {
+            isForward = false; // 如果速度小于0, 则为后退
+            speed = -speed; // 取绝对值
         }
-
+        if (speed > 28.0f) {
+            speed = 28.0f; // 限制最大速度
+        }
+        uint16_t normalizedSpeed = static_cast<uint16_t>((speed / 28.0f) * 1000.0f); // 归一化到 0-1000 范围
+        datagram = QByteArray::number(normalizedSpeed);
+        if (bytes->paused == true)
+            datagram += ",P"; // 添加暂停标志
+        else
+            datagram += (isForward ? ",F" : ",B"); // 添加前进或后退标志
+        // 发送数据报到目标地址和端口
+        udpSocket->writeDatagram(datagram, targetAddress, targetPort);        
+        qDebug() << "Speed: " << bytes->truck_f.speed << "m/s" << "Datagram: " << datagram;
         // sleep
-        QThread::msleep(100);
+        QThread::msleep(125);
         // 处理事件队列
         QCoreApplication::processEvents();
     }

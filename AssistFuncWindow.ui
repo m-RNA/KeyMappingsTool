@@ -66,7 +66,7 @@
        <string>踩油门将自动解除手刹, 要求手刹的键盘按键为空格键</string>
       </property>
       <property name="text">
-       <string>自动解除手刹</string>
+       <string>UDP发送卡车速度（m/s）</string>
       </property>
      </widget>
      <widget class="Line" name="line">
