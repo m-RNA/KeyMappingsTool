@@ -27,6 +27,7 @@ SOURCES += \
 HEADERS += \
     AssistFuncWindow.h \
     AssistFuncWorker.h \
+    BigKey.hpp \
     BtnTriggerTypeEnum.h \
     DeadAreaSettings.h \
     ETS2_KeyBinder/manuallybinder.h \
